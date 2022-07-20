@@ -30,7 +30,8 @@ use hyper::server::conn::{AddrIncoming, AddrStream};
 use pegasus::api::function::FnResult;
 use pegasus::api::FromStream;
 use pegasus::result::{FromStreamExt, ResultSink};
-use pegasus::{Configuration, JobConf, ServerConf};
+use pegasus::{Configuration, Data, JobConf, ServerConf};
+use pegasus_network::config::ServerAddr;
 use pegasus_network::ServerDetect;
 use serde::Deserialize;
 use tokio::sync::mpsc::UnboundedSender;
@@ -102,15 +103,15 @@ impl Drop for RpcSink {
 }
 
 #[derive(Clone)]
-pub struct JobServiceImpl<P> {
-    inner: Arc<P>,
+pub struct JobServiceImpl<I> {
+    inner: Arc<dyn JobAssembly<I>>,
     report: bool,
 }
 
 #[tonic::async_trait]
-impl<P: JobAssembly> pb::job_service_server::JobService for JobServiceImpl<P>
+impl<I> pb::job_service_server::JobService for JobServiceImpl<I>
 where
-    P: JobAssembly,
+    I: Data,
 {
     async fn add_library(&self, request: Request<BinaryResource>) -> Result<Response<Empty>, Status> {
         let BinaryResource { name, resource } = request.into_inner();
@@ -226,12 +227,12 @@ pub struct RPCJobServer<S: pb::job_service_server::JobService> {
 }
 
 /// start both rpc server and pegasus server
-pub async fn start_all<P, D, E>(
+pub async fn start_all<I: Data, P, D, E>(
     rpc_config: RPCServerConfig, server_config: Configuration, assemble: P, server_detector: D,
     mut listener: E,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: JobAssembly,
+    P: JobAssembly<I>,
     D: ServerDetect + 'static,
     E: ServiceStartListener,
 {
@@ -244,11 +245,11 @@ where
 }
 
 /// startup rpc server
-pub async fn start_rpc_server<P, E>(
+pub async fn start_rpc_server<I: Data, P, E>(
     server_id: u64, rpc_config: RPCServerConfig, assemble: P, listener: E,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: JobAssembly,
+    P: JobAssembly<I>,
     E: ServiceStartListener,
 {
     let service = JobServiceImpl { inner: Arc::new(assemble), report: true };
@@ -298,11 +299,13 @@ impl<S: pb::job_service_server::JobService> RPCJobServer<S> {
 
         let service = builder.add_service(pb::job_service_server::JobServiceServer::new(service));
 
-        let host = rpc_config
+        let rpc_host = rpc_config
             .rpc_host
             .clone()
             .unwrap_or("0.0.0.0".to_owned());
-        let addr = SocketAddr::new(host.parse()?, rpc_config.rpc_port.unwrap_or(0));
+        let rpc_port = rpc_config.rpc_port.unwrap_or(0);
+        let rpc_server_addr = ServerAddr::new(rpc_host, rpc_port);
+        let addr = rpc_server_addr.to_socket_addr()?;
         let ka = rpc_config
             .tcp_keep_alive_ms
             .map(|d| Duration::from_millis(d));

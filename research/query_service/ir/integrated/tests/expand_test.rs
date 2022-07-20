@@ -32,7 +32,7 @@ mod test {
     use pegasus::result::ResultStream;
     use pegasus::JobConf;
     use runtime::process::operator::flatmap::FlatMapFuncGen;
-    use runtime::process::operator::map::{FilterMapFuncGen, MapFuncGen};
+    use runtime::process::operator::map::FilterMapFuncGen;
     use runtime::process::operator::source::SourceOperator;
     use runtime::process::record::Record;
 
@@ -42,11 +42,9 @@ mod test {
     fn source_gen(alias: Option<common_pb::NameOrId>) -> Box<dyn Iterator<Item = Record> + Send> {
         create_exp_store();
         let scan_opr_pb = pb::Scan { scan_opt: 0, alias, params: None, idx_predicate: None };
-        let mut source_opr_pb =
-            pb::logical_plan::Operator { opr: Some(pb::logical_plan::operator::Opr::Scan(scan_opr_pb)) };
+        let source_opr_pb = pb::logical_plan::operator::Opr::Scan(scan_opr_pb);
         let source =
-            SourceOperator::new(&mut source_opr_pb, 1, 1, Arc::new(SimplePartition { num_servers: 1 }))
-                .unwrap();
+            SourceOperator::new(source_opr_pb, 1, 1, Arc::new(SimplePartition { num_servers: 1 })).unwrap();
         source.gen_source(0).unwrap()
     }
 
@@ -269,8 +267,8 @@ mod test {
             let expand = expand.clone();
             |input, output| {
                 let mut stream = input.input_from(source_gen(Some(TAG_A.into())))?;
-                let map_func = project.gen_map().unwrap();
-                stream = stream.map(move |input| map_func.exec(input))?;
+                let filter_map_func = project.gen_filter_map().unwrap();
+                stream = stream.filter_map(move |input| filter_map_func.exec(input))?;
                 let flatmap_func = expand.gen_flat_map().unwrap();
                 stream = stream.flat_map(move |input| flatmap_func.exec(input))?;
                 stream.sink_into(output)
@@ -382,8 +380,8 @@ mod test {
                 let mut stream = input.input_from(source_gen(None))?;
                 let flatmap_func = expand.gen_flat_map().unwrap();
                 stream = stream.flat_map(move |input| flatmap_func.exec(input))?;
-                let map_func = getv.gen_map().unwrap();
-                stream = stream.map(move |input| map_func.exec(input))?;
+                let filter_map_func = getv.gen_filter_map().unwrap();
+                stream = stream.filter_map(move |input| filter_map_func.exec(input))?;
                 stream.sink_into(output)
             }
         })
@@ -431,8 +429,8 @@ mod test {
                 let mut stream = input.input_from(source_gen(None))?;
                 let flatmap_func = expand.gen_flat_map().unwrap();
                 stream = stream.flat_map(move |input| flatmap_func.exec(input))?;
-                let map_func = getv.gen_map().unwrap();
-                stream = stream.map(move |input| map_func.exec(input))?;
+                let filter_map_func = getv.gen_filter_map().unwrap();
+                stream = stream.filter_map(move |input| filter_map_func.exec(input))?;
                 stream.sink_into(output)
             }
         })
@@ -480,8 +478,8 @@ mod test {
                 let mut stream = input.input_from(source_gen(None))?;
                 let flatmap_func = expand.gen_flat_map().unwrap();
                 stream = stream.flat_map(move |input| flatmap_func.exec(input))?;
-                let map_func = getv.gen_map().unwrap();
-                stream = stream.map(move |input| map_func.exec(input))?;
+                let filter_map_func = getv.gen_filter_map().unwrap();
+                stream = stream.filter_map(move |input| filter_map_func.exec(input))?;
                 stream.sink_into(output)
             }
         })
