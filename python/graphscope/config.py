@@ -19,6 +19,7 @@
 """ GraphScope default configuration.
 """
 
+from graphscope.version import __is_prerelease__
 from graphscope.version import __version__
 
 
@@ -37,7 +38,9 @@ class GSConfig(object):
     # image
     k8s_etcd_image = "quay.io/coreos/etcd:v3.4.13"
     k8s_gs_image = (
-        f"registry.cn-hongkong.aliyuncs.com/graphscope/graphscope:{__version__}"
+        "registry.cn-hongkong.aliyuncs.com/graphscope/graphscope:nightly"
+        if __is_prerelease__
+        else f"registry.cn-hongkong.aliyuncs.com/graphscope/graphscope:{__version__}"
     )
 
     # image pull configuration
@@ -50,6 +53,8 @@ class GSConfig(object):
 
     # etcd resource configuration
     etcd_addrs = None
+    etcd_listening_client_port = 2379
+    etcd_listening_peer_port = 2380
     k8s_etcd_num_pods = 1
     k8s_etcd_cpu = 1.0
     k8s_etcd_mem = "512Mi"
@@ -102,7 +107,9 @@ class GSConfig(object):
     # Demo dataset related
     mount_dataset = None
     k8s_dataset_image = (
-        f"registry.cn-hongkong.aliyuncs.com/graphscope/dataset:{__version__}"
+        "registry.cn-hongkong.aliyuncs.com/graphscope/dataset:nightly"
+        if __is_prerelease__
+        else f"registry.cn-hongkong.aliyuncs.com/graphscope/dataset:{__version__}"
     )
 
     # download_retries
